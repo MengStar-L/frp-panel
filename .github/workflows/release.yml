@@ -1,0 +1,79 @@
+name: Release
+
+# Cross-compiles the single binary for Windows x64, Linux x64 and Linux arm64,
+# then publishes the archives to a GitHub Release. Mirrors the local build:
+# build the Vue frontend first (it is embedded via //go:embed), then `go build`.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to build & release (e.g. v1.0.1)'
+        required: true
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write          # needed to create the release / upload assets
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build frontend (embedded into the binary)
+        run: |
+          cd web
+          npm ci
+          npm run build
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Cross-compile binaries
+        env:
+          CGO_ENABLED: '0'
+        run: |
+          VERSION="${{ github.event.inputs.tag || github.ref_name }}"
+          mkdir -p dist-bin/stage
+
+          build_tar() {
+            local goos="$1" goarch="$2"
+            GOOS="$goos" GOARCH="$goarch" go build -trimpath -ldflags='-s -w' -o dist-bin/stage/frp-panel .
+            tar --mode=755 -czf "dist-bin/frp-panel_${VERSION}_${goos}_${goarch}.tar.gz" -C dist-bin/stage frp-panel
+            rm -f dist-bin/stage/frp-panel
+          }
+
+          build_tar linux amd64
+          build_tar linux arm64
+
+          GOOS=windows GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o dist-bin/stage/frp-panel.exe .
+          ( cd dist-bin/stage && zip -j "../frp-panel_${VERSION}_windows_amd64.zip" frp-panel.exe )
+
+          rm -rf dist-bin/stage
+          ( cd dist-bin && sha256sum *.tar.gz *.zip > checksums.txt )
+          ls -la dist-bin
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          files: |
+            dist-bin/frp-panel_*_windows_amd64.zip
+            dist-bin/frp-panel_*_linux_amd64.tar.gz
+            dist-bin/frp-panel_*_linux_arm64.tar.gz
+            dist-bin/checksums.txt
