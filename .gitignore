@@ -1,0 +1,31 @@
+# Build output
+/frp-panel
+/frp-panel.exe
+/dist-bin/
+
+# Downloaded frp binaries (fetched at runtime, live beside the program)
+/frps
+/frps.exe
+/frpc
+/frpc.exe
+/frp_*/
+
+# Runtime config & state (live beside the program)
+/panel.json
+/frps.toml
+/frpc.toml
+/logs/
+*.log
+
+# Local preview / test data dir
+/preview-data/
+
+# Frontend
+/web/node_modules/
+# dist is embedded into the binary at build time; keep it out of git
+/web/dist/*
+!/web/dist/.gitkeep
+
+# Misc
+.DS_Store
+Thumbs.db
