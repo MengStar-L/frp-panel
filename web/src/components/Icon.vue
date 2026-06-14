@@ -2,6 +2,8 @@
   <svg
     xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 24 24"
+    :width="size"
+    :height="size"
     fill="none"
     stroke="currentColor"
     stroke-width="2"
@@ -14,7 +16,14 @@
 <script setup>
 import { computed } from 'vue'
 
-const props = defineProps({ name: { type: String, required: true } })
+// `size` is rendered as the svg width/height *presentation attributes*, which sit
+// at the bottom of the CSS cascade — so any `.btn svg` / `.nav svg` rule, inline
+// `style`, or sizing class on the icon still overrides it. Its only job is to give
+// otherwise-unsized icons a sane default instead of the browser's 300×150 fallback.
+const props = defineProps({
+  name: { type: String, required: true },
+  size: { type: [Number, String], default: 16 },
+})
 
 const paths = {
   'layout-grid':

@@ -256,11 +256,14 @@ button { font-family: inherit; }
 @keyframes indeterminate { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes slideIn { from { opacity: 0; transform: translateY(-50%) scaleY(0.3); } to { opacity: 1; transform: translateY(-50%) scaleY(1); } }
-@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeUp { from { opacity: 0; transform: translate3d(0, 12px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
 @keyframes popIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
 
 /* staggered entrance for grids / lists */
-.enter-up { animation: fadeUp 0.5s var(--ease-out) both; }
+/* `translateZ(0)` keeps the card on a stable GPU layer; `backwards` (not `both`)
+   lets it fall back to that promoted base state when fadeUp ends, so the layer
+   is never torn down and the card doesn't snap ~1px on the final frame. */
+.enter-up { transform: translateZ(0); animation: fadeUp 0.5s var(--ease-out) backwards; }
 .enter-up:nth-child(2) { animation-delay: 0.05s; }
 .enter-up:nth-child(3) { animation-delay: 0.1s; }
 .enter-up:nth-child(4) { animation-delay: 0.15s; }
@@ -269,10 +272,14 @@ button { font-family: inherit; }
 .pop { animation: popIn 0.3s var(--ease-out) both; }
 
 /* ---------- route transition ---------- */
-.fade-slide-enter-active { transition: all 0.32s var(--ease-out); }
-.fade-slide-leave-active { transition: all 0.18s var(--ease); position: absolute; width: 100%; }
-.fade-slide-enter-from { opacity: 0; transform: translateY(14px); }
-.fade-slide-leave-to { opacity: 0; transform: translateY(-8px); }
+/* Route transition is opacity-only on purpose: the per-card .enter-up animation
+   already supplies the upward slide. Stacking a second translateY on the whole
+   page container made everything snap ~1px when the shorter animation's GPU
+   layer was torn down at its end. Opacity teardown changes no geometry. */
+.fade-slide-enter-active { transition: opacity 0.28s var(--ease-out); }
+.fade-slide-leave-active { transition: opacity 0.16s var(--ease); position: absolute; width: 100%; }
+.fade-slide-enter-from { opacity: 0; }
+.fade-slide-leave-to { opacity: 0; }
 
 /* generic list transition */
 .list-enter-active { transition: all 0.3s var(--ease-out); }
