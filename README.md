@@ -51,6 +51,64 @@ rm -rf /opt/frp-panel             # 连同配置与已下载的 frp 二进制一
 
 > ⚠️ 服务默认以 root 运行(frp 常需绑定低端口、管理网络穿透)。请勿将管理端口直接暴露公网,建议置于反向代理 + TLS 之后。重复执行安装命令即可原地升级到最新版(数据保留)。
 
+### OpenWrt / 无 systemd 环境(procd)
+
+OpenWrt 基于 BusyBox + procd,既没有 `sudo` 也没有 `systemctl`,上面的一键脚本不适用,需手动安装并注册 procd 服务。**当前 Release 仅提供 `x86_64` / `arm64` 二进制**,mips、32 位 arm 等路由器芯片需自行交叉编译(见下文「从源码构建」)。
+
+> ⚠️ OpenWrt 根分区(flash)通常很小,建议装到外置存储(如 USB 挂载点 `/mnt/sda/...`);frp-panel 拉取的 frps/frpc 也会存在同级目录。
+
+OpenWrt 默认即 root,无需 sudo:
+
+```sh
+# 1) 按架构下载并解压到指定目录(按需修改 DIR 与版本号)
+DIR=/mnt/sda/opt/frp-panel
+case "$(uname -m)" in
+  x86_64)  A=amd64 ;;
+  aarch64) A=arm64 ;;
+  *) echo "无预编译二进制: $(uname -m),请自行交叉编译"; exit 1 ;;
+esac
+mkdir -p "$DIR" && cd /tmp
+curl -fsSL "https://github.com/MengStar-L/frp-panel/releases/download/v1.0.0/frp-panel_v1.0.0_linux_${A}.tar.gz" -o fp.tgz
+tar -xzf fp.tgz -C "$DIR"
+
+# 2) 写入 procd 服务(开机自启 + 崩溃自动拉起)
+cat > /etc/init.d/frp-panel <<EOF
+#!/bin/sh /etc/rc.common
+USE_PROCD=1
+START=95
+STOP=10
+start_service() {
+    procd_open_instance
+    procd_set_param command $DIR/frp-panel -dir $DIR -addr :8088
+    procd_set_param respawn
+    procd_set_param stdout 1
+    procd_set_param stderr 1
+    procd_close_instance
+}
+EOF
+chmod +x /etc/init.d/frp-panel
+/etc/init.d/frp-panel enable
+/etc/init.d/frp-panel start
+```
+
+浏览器打开 `http://<路由器IP>:8088` 按向导初始化即可。常用运维:
+
+```sh
+/etc/init.d/frp-panel status      # 运行状态
+logread -e frp-panel              # 查看日志(加 -f 实时跟随)
+/etc/init.d/frp-panel restart     # 重启
+```
+
+升级:`/etc/init.d/frp-panel stop` 后重跑上面第 1 步覆盖二进制,再 `start` 即可(数据保留)。
+
+卸载(保留数据可跳过最后一行):
+
+```sh
+/etc/init.d/frp-panel disable && /etc/init.d/frp-panel stop
+rm -f /etc/init.d/frp-panel
+rm -rf /mnt/sda/opt/frp-panel     # 连同配置与已下载的 frp 二进制一并删除
+```
+
 ### 直接运行
 
 把编译好的 `frp-panel`(Windows 为 `frp-panel.exe`)放到任意目录,运行后浏览器打开提示的地址(默认 `http://localhost:8088`),按向导完成初始化即可。
@@ -76,6 +134,9 @@ go build -o frp-panel .          # 当前平台
 # 交叉编译示例:
 GOOS=linux  GOARCH=amd64 go build -o frp-panel       .
 GOOS=windows GOARCH=amd64 go build -o frp-panel.exe  .
+# OpenWrt 路由器(无 FPU 的芯片用 softfloat):
+GOOS=linux  GOARCH=arm    GOARM=7          go build -o frp-panel .   # 32 位 ARM
+GOOS=linux  GOARCH=mipsle GOMIPS=softfloat go build -o frp-panel .   # mipsel(如 MT7621)
 ```
 
 或使用 `make`:
