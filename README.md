@@ -16,6 +16,41 @@
 
 ## 🚀 使用
 
+### 一键部署(Linux · systemd · 推荐)
+
+在服务器上以 **root** 执行 —— 自动识别 `x86_64` / `arm64`、拉取最新 Release、默认安装到 `/opt/frp-panel`、注册 systemd 服务并开机自启:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/MengStar-L/frp-panel/master/scripts/install.sh | sudo bash
+```
+
+完成后浏览器打开 `http://<服务器IP>:8088`,按向导初始化即可。脚本下载时会做 SHA256 校验。
+
+自定义安装目录 / 端口 / 版本(默认目录即 `/opt/frp-panel`):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/MengStar-L/frp-panel/master/scripts/install.sh \
+  | sudo INSTALL_DIR=/opt/frp-panel PORT=8088 VERSION=v1.0.0 bash
+```
+
+常用运维:
+
+```bash
+systemctl status frp-panel        # 查看状态
+journalctl -u frp-panel -f        # 实时日志
+systemctl restart frp-panel       # 重启
+```
+
+卸载(保留数据可跳过最后一行):
+
+```bash
+systemctl disable --now frp-panel
+rm -f /etc/systemd/system/frp-panel.service && systemctl daemon-reload
+rm -rf /opt/frp-panel             # 连同配置与已下载的 frp 二进制一并删除
+```
+
+> ⚠️ 服务默认以 root 运行(frp 常需绑定低端口、管理网络穿透)。请勿将管理端口直接暴露公网,建议置于反向代理 + TLS 之后。重复执行安装命令即可原地升级到最新版(数据保留)。
+
 ### 直接运行
 
 把编译好的 `frp-panel`(Windows 为 `frp-panel.exe`)放到任意目录,运行后浏览器打开提示的地址(默认 `http://localhost:8088`),按向导完成初始化即可。
